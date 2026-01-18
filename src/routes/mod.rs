@@ -304,7 +304,6 @@ pub async fn deploy_service(
     Path(service_id): Path<i64>,
 ) -> impl IntoResponse {
     event!(Level::INFO, "GET /api/service/:id/deploy");
-    event!(Level::ERROR, "{:?}|{}", app_state, service_id);
     let service = db::get_service(&app_state.pool, service_id.clone()).await;
 
     tokio::spawn(async move {

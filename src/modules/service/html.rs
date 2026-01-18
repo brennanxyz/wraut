@@ -135,6 +135,7 @@ fn app_status_class(status: &ServiceStatus) -> String {
         | ServiceStatus::Pulling
         | ServiceStatus::Stopping
         | ServiceStatus::Starting
+        | ServiceStatus::Copying
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }
@@ -149,6 +150,7 @@ fn app_status_name(status: &ServiceStatus) -> String {
         | ServiceStatus::Pulling
         | ServiceStatus::Stopping
         | ServiceStatus::Starting
+        | ServiceStatus::Copying
         | ServiceStatus::DeploymentRequested => "Service pending...".to_string(),
         _ => "Connected".to_string(),
     }
@@ -165,6 +167,7 @@ fn service_class_name(status: &ServiceStatus) -> String {
         | ServiceStatus::Pulling
         | ServiceStatus::Stopping
         | ServiceStatus::Starting
+        | ServiceStatus::Copying
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }

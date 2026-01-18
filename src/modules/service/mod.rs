@@ -22,6 +22,7 @@ pub enum ServiceStatus {
     Pulling,
     Stopping,
     Starting,
+    Copying,
     Unknown,
 }
 
@@ -41,6 +42,10 @@ impl ServiceStatus {
             ServiceError::Start => {
                 Self::CommandFailed("Failed to start Docker service".to_string())
             }
+            ServiceError::Remove => {
+                Self::CommandFailed("Failed to remove live directory contents".to_string())
+            }
+            ServiceError::Copy => Self::CommandFailed("Failed to copy repo contents".to_string()),
             ServiceError::Unknown => Self::Unknown,
             ServiceError::Discovery => Self::DiscoveryFailed,
             ServiceError::CloneOrPull => Self::CloneOrPullFailed,
@@ -59,6 +64,7 @@ impl ServiceStatus {
             Self::Pulling => "Pulling repo...".into(),
             Self::Stopping => "Stopping service...".into(),
             Self::Starting => "Starting service...".into(),
+            Self::Copying => "Copying repo...".into(),
             Self::Unknown => "Unknown status".into(),
         }
     }
@@ -110,6 +116,10 @@ pub enum ServiceError {
     CloneOrPull,
     #[error("Error starting the Docker service")]
     Start,
+    #[error("Error removing the contents of a directory")]
+    Remove,
+    #[error("Error copying the contents of a directory")]
+    Copy,
 }
 
 impl Service {
@@ -181,8 +191,6 @@ impl Service {
 
         let chkdir_output_string = std::str::from_utf8(&chkdir_output.stdout)?;
 
-        event!(Level::WARN, "||{}||", chkdir_output_string);
-
         match chkdir_output_string {
             "Y\n" => Ok((path, false)),
             "N\n" => {
@@ -217,7 +225,7 @@ impl Service {
             None => None,
         };
 
-        let mut path = config.services_root_dir;
+        let mut path = config.services_repo_dir;
         path.push(&self.name);
 
         let (path, created) = Service::get_or_create_directory(path)?;
@@ -273,6 +281,67 @@ impl Service {
         }
     }
 
+    pub fn copy_to_live(
+        &self,
+        config: Config,
+        br: broadcast::Sender<ServiceEvent>,
+    ) -> Result<(), ServiceError> {
+        let _ = br.send(ServiceEvent::ServiceUpdate {
+            id: self.id,
+            status: ServiceStatus::Copying,
+        });
+
+        let mut live_path = config.services_live_dir;
+        live_path.push(self.name.clone());
+
+        let (live_path, created) = Service::get_or_create_directory(live_path)?;
+
+        let mut live_path_contents = live_path.clone();
+        live_path_contents.push("*");
+
+        if !created {
+            let rm_outp = Command::new("rm")
+                .arg("-rf")
+                .arg(live_path_contents.to_string_lossy().to_string())
+                .output()?;
+
+            match rm_outp.status.success() {
+                true => (),
+                false => {
+                    event!(
+                        Level::ERROR,
+                        "{}",
+                        std::str::from_utf8(&rm_outp.stderr).unwrap_or("NA")
+                    );
+                    return Err(ServiceError::Remove);
+                }
+            }
+        }
+
+        let mut repo_path_contents = config.services_repo_dir;
+        repo_path_contents.push(self.name.clone());
+        repo_path_contents.push(".");
+
+        let cp_outp = Command::new("cp")
+            .arg("-af")
+            .arg(repo_path_contents.to_string_lossy().to_string())
+            .arg(".")
+            .current_dir(live_path.to_string_lossy().to_string())
+            .output()?;
+
+        match cp_outp.status.success() {
+            true => Ok(()),
+            false => {
+                event!(
+                    Level::ERROR,
+                    "{}",
+                    std::str::from_utf8(&cp_outp.stderr).unwrap_or("NA")
+                );
+                Err(ServiceError::Copy)
+            }
+        }
+    }
+
     pub fn stop(
         &self,
         config: Config,
@@ -283,7 +352,7 @@ impl Service {
             status: ServiceStatus::Stopping,
         });
 
-        let mut path = config.services_root_dir;
+        let mut path = config.services_repo_dir;
         path.push(&self.name);
 
         let (path, _) = Service::get_or_create_directory(path)?;
@@ -307,7 +376,7 @@ impl Service {
             status: ServiceStatus::Starting,
         });
 
-        let mut path = config.services_root_dir;
+        let mut path = config.services_repo_dir;
         path.push(&self.name);
 
         let (path, _) = Service::get_or_create_directory(path)?;
@@ -360,6 +429,8 @@ impl Service {
                 };
 
                 serv.clone_or_pull(config.clone(), br.clone())?;
+
+                serv.copy_to_live(config.clone(), br.clone())?;
 
                 if serv.is_running(&services) {
                     serv.stop(config.clone(), br.clone())?;
