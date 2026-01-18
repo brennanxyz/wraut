@@ -150,7 +150,7 @@ pub async fn app() -> impl IntoResponse {
             <body hx-ext=\"sse\">
                 <div class=\"body\">
                     <div class=\"banner row header\" style=\"display:flex;flex-direction:row;justify-content:space-between\">
-                        <div style=\"padding: 2px 0px 2px 0px;\">Title of the APPLICATION</div>
+                        <div style=\"padding: 2px 0px 2px 0px;\">WRAUT</div>
                         <div
                             id=\"live-service-connection\"
                             sse-connect=\"/html/live_services\"
