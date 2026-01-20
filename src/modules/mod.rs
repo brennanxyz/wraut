@@ -91,7 +91,7 @@ impl ServiceHTML {
                     ht.element,
                     ht.id,
                     match &ht.class {
-                        Some(c) => format!("class=\"{}\"", c),
+                        Some(c) => format!("class=\"{}-chip\"", c),
                         None => "".to_string(),
                     },
                     ht.html_content,
@@ -142,6 +142,7 @@ impl ServiceBroadcast {
                     ServiceEvent::AllStatus => {
                         let db_list = db::get_services(&pool).await;
                         yield(Ok(service::html::list(db_list, docker_list).render()));
+                        yield(Ok(service::html::reset_button()));
                     },
                     ServiceEvent::ServiceUpdate {id, status} => {
                         event!(Level::WARN, "{:?}", status);

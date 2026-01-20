@@ -1,5 +1,5 @@
 [package]
-name = "route_traffic"
+name = "wraut"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,7 +13,7 @@ axum = { version = "0.8.7", features = [
 dotenv = { version = "0.15.0" }
 futures = { version = "0.3.31" }
 serde = { version = "1.0.228" }
-serde_json = { version = "1.0.145" }
+serde_json = { version = "1.0.149" }
 serde_yaml = { version = "0.9.34" }
 sqlx = { version = "0.8.5", features = [
     "runtime-tokio-native-tls",

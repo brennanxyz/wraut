@@ -3,6 +3,7 @@ pub mod html;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use serde_yaml::Error as SerdeError;
 use std::process::{Command, Output};
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -23,6 +24,7 @@ pub enum ServiceStatus {
     Stopping,
     Starting,
     Copying,
+    RewritingConfig,
     Unknown,
 }
 
@@ -42,10 +44,13 @@ impl ServiceStatus {
             ServiceError::Start => {
                 Self::CommandFailed("Failed to start Docker service".to_string())
             }
+            ServiceError::Stop => Self::CommandFailed("Failed to stop Docker service".to_string()),
             ServiceError::Remove => {
                 Self::CommandFailed("Failed to remove live directory contents".to_string())
             }
             ServiceError::Copy => Self::CommandFailed("Failed to copy repo contents".to_string()),
+            ServiceError::Yaml(_) => Self::CommandFailed("Failed to parse YAML file".to_string()),
+            ServiceError::Key(k) => Self::CommandFailed(format!("Failed to find key '{}'", k)),
             ServiceError::Unknown => Self::Unknown,
             ServiceError::Discovery => Self::DiscoveryFailed,
             ServiceError::CloneOrPull => Self::CloneOrPullFailed,
@@ -65,6 +70,7 @@ impl ServiceStatus {
             Self::Stopping => "Stopping service...".into(),
             Self::Starting => "Starting service...".into(),
             Self::Copying => "Copying repo...".into(),
+            Self::RewritingConfig => "Rewriting docker-compose.yml...".into(),
             Self::Unknown => "Unknown status".into(),
         }
     }
@@ -81,6 +87,7 @@ pub enum ServiceEvent {
 pub struct Service {
     pub id: i64,
     pub name: String,
+    pub compose_name: String,
     pub repo_url: String,
     pub access_url: String,
     pub active: bool,
@@ -116,10 +123,16 @@ pub enum ServiceError {
     CloneOrPull,
     #[error("Error starting the Docker service")]
     Start,
+    #[error("Error stopping the Docker service")]
+    Stop,
     #[error("Error removing the contents of a directory")]
     Remove,
     #[error("Error copying the contents of a directory")]
     Copy,
+    #[error("Error parsing YAML file")]
+    Yaml(#[from] SerdeError),
+    #[error("Error parsing expected key")]
+    Key(String),
 }
 
 impl Service {
@@ -168,8 +181,8 @@ impl Service {
         }
     }
 
-    fn make_tags(&self) -> Vec<&'static str> {
-        vec![""]
+    fn make_labels(&self) -> Vec<String> {
+        vec![self.label_name()]
     }
 
     // on Result::Ok, returns path, and a boolean: true = created; false = got existing
@@ -218,7 +231,7 @@ impl Service {
     pub fn clone_or_pull(
         &self,
         config: Config,
-        br: broadcast::Sender<ServiceEvent>,
+        br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
         let cf_string_opt = match self.cred_file.clone() {
             Some(cf) => Some(format!(" -c \"core.sshCommand=ssh -i {}\" ", cf)),
@@ -284,7 +297,7 @@ impl Service {
     pub fn copy_to_live(
         &self,
         config: Config,
-        br: broadcast::Sender<ServiceEvent>,
+        br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
         let _ = br.send(ServiceEvent::ServiceUpdate {
             id: self.id,
@@ -342,52 +355,146 @@ impl Service {
         }
     }
 
+    pub fn apply_tags(
+        &self,
+        config: Config,
+        br: &broadcast::Sender<ServiceEvent>,
+    ) -> Result<(), ServiceError> {
+        let _ = br.send(ServiceEvent::ServiceUpdate {
+            id: self.id,
+            status: ServiceStatus::RewritingConfig,
+        });
+
+        // Read docker-compose file
+        let mut compose_path = config.services_live_dir;
+        compose_path.push(self.name.clone());
+        compose_path.push("docker-compose.yaml");
+        let compose_content = std::fs::read_to_string(compose_path.clone())?;
+        let mut compose: serde_yaml::Value = serde_yaml::from_str(&compose_content)?;
+
+        // Get or create labels
+        let services = match compose.get_mut("services") {
+            Some(svcs) => svcs,
+            None => {
+                return Err(ServiceError::Key("services".into()));
+            }
+        };
+
+        let service = match services.get_mut(self.compose_name.clone()) {
+            Some(svc) => svc,
+            None => {
+                return Err(ServiceError::Key(self.compose_name.clone()));
+            }
+        };
+
+        let service_map = match service.as_mapping_mut() {
+            Some(sm) => sm,
+            None => {
+                return Err(ServiceError::Key(format!(
+                    "{} (as map)",
+                    self.compose_name.clone()
+                )));
+            }
+        };
+
+        let labels = service_map
+            .entry(serde_yaml::Value::String("labels".into()))
+            .or_insert_with(|| serde_yaml::Value::Sequence(vec![]));
+
+        let label_array = match labels.as_sequence_mut() {
+            Some(la) => la,
+            None => {
+                return Err(ServiceError::Key(format!(
+                    "{} labels (as sequence)",
+                    self.compose_name.clone()
+                )));
+            }
+        };
+
+        for label in self.make_labels() {
+            label_array.push(serde_yaml::Value::String(label))
+        }
+
+        let yaml_string: String = serde_yaml::to_string(&compose)?;
+
+        std::fs::write(compose_path, yaml_string)?;
+
+        // Write back to file
+        Ok(())
+    }
+
     pub fn stop(
         &self,
         config: Config,
-        br: broadcast::Sender<ServiceEvent>,
+        br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
         let _ = br.send(ServiceEvent::ServiceUpdate {
             id: self.id,
             status: ServiceStatus::Stopping,
         });
 
-        let mut path = config.services_repo_dir;
+        let mut path = config.services_live_dir;
         path.push(&self.name);
 
         let (path, _) = Service::get_or_create_directory(path)?;
 
-        Command::new(format!(
-            "mv {} && docker compose stop",
-            path.to_string_lossy(),
-        ))
-        .output()?;
+        let outp = Command::new("docker")
+            .arg("compose")
+            .arg("stop")
+            .current_dir(path.to_string_lossy().to_string())
+            .output()?;
 
-        Ok(())
+        match outp.status.success() {
+            true => Ok(()),
+            false => Err(ServiceError::Stop),
+        }
     }
 
     pub fn start(
         &self,
         config: Config,
-        br: broadcast::Sender<ServiceEvent>,
+        br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
         let _ = br.send(ServiceEvent::ServiceUpdate {
             id: self.id,
             status: ServiceStatus::Starting,
         });
 
-        let mut path = config.services_repo_dir;
+        let mut path = config.services_live_dir;
         path.push(&self.name);
 
-        let (path, _) = Service::get_or_create_directory(path)?;
+        let (path, created) = match Service::get_or_create_directory(path) {
+            Ok(outp) => outp,
+            Err(e) => {
+                event!(Level::ERROR, "GOC | {}", e);
+                return Err(e);
+            }
+        };
 
-        let output = Command::new("docker")
+        if created {
+            event!(
+                Level::ERROR,
+                "Service {} created its live dir when it should already exist",
+                self.name
+            );
+            return Err(ServiceError::Unexpected);
+        }
+
+        event!(Level::INFO, "{}", path.to_string_lossy().to_string());
+
+        let output = match Command::new("docker")
             .arg("compose")
             .arg("up")
             .arg("-d")
-            .args(&self.make_tags())
             .current_dir(path.to_string_lossy().to_string())
-            .output()?;
+            .output()
+        {
+            Ok(outp) => outp,
+            Err(e) => {
+                event!(Level::ERROR, "DCE | {}", e);
+                return Err(ServiceError::Command(e));
+            }
+        };
 
         match output.status.success() {
             true => Ok(()),
@@ -428,15 +535,17 @@ impl Service {
                     }
                 };
 
-                serv.clone_or_pull(config.clone(), br.clone())?;
+                serv.clone_or_pull(config.clone(), &br)?;
 
-                serv.copy_to_live(config.clone(), br.clone())?;
+                serv.copy_to_live(config.clone(), &br)?;
+
+                serv.apply_tags(config.clone(), &br)?;
 
                 if serv.is_running(&services) {
-                    serv.stop(config.clone(), br.clone())?;
+                    serv.stop(config.clone(), &br)?;
                 }
 
-                serv.start(config, br)?;
+                serv.start(config, &br)?;
 
                 Ok(())
             }

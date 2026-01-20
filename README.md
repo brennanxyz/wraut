@@ -22,6 +22,12 @@ satisfies the following constraints:
   - ports 80 and 443 exposed
   - volume: `"/var/run/docker.sock:/var/run/docker.sock:ro"`
 
+### Service requirements
+
+The services that run on it must comply with the following
+requirements:
+1. Have a `docker-compose.yml` file in the base of the repo.
+
 There will be some config you'll need to provide Wraut as
 a `.env` file (TODO: commit the `.env.sample` and a guide to
 selecting the appropriate values).

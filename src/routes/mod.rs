@@ -163,6 +163,15 @@ pub async fn app() -> impl IntoResponse {
                     <table id=\"services-list\">
                         <tr><td>Waiting connection...</td></tr>
                     </table>
+                    <div
+                        id=\"add-service-btn\"
+                        style=\"margin:12px;border-radius:4px;cursor:pointer;\"
+                        class=\"success-chip\"
+                        hx-get=\"/html/service_form\"
+                        hx-swap=\"outerHTML\"
+                    >
+                        + Add service
+                    </div>
                 </div>
             </body>
         </html>
@@ -175,17 +184,23 @@ pub async fn new_service_form() -> impl IntoResponse {
 
     return Html(
         "
-        <td colspan=\"2\" align=\"center\" class=\"form block\">
-            <form hx-post=\"/api/service\" hx-target=\"#services-list\">
-                <table>
-                    <tr><td align=\"right\">Name:</td><td><input name=\"name\" /></td></tr>
-                    <tr><td align=\"right\">Repo URL:</td><td><input name=\"repo_url\" /></td></tr>
-                    <tr><td align=\"right\">Access URL:</td><td><input name=\"access_url\" /></td></tr>
-                    <tr><td align=\"right\">Active:</td><td><input name=\"active\" type=\"checkbox\" value=\"true\" /></td></tr>
-                    <tr><td align=\"center\" colspan=\"2\"><button type=\"submit\">Submit</button></td></tr>
-                </table>
-            </form>
-        </td>        
+        <form
+            id=\"add-service-btn\"
+            hx-post=\"/api/service\"
+            hx-target=\"#services-list\"
+            style=\"margin:12px;border-radius:4px;margin-left:auto;margin-right:auto;\"
+            class=\"success-chip\"
+        >
+            <table>
+                <tr><td align=\"right\">Name:</td><td><input name=\"name\" /></td></tr>
+                <tr><td align=\"right\">Compose Name:</td><td><input name=\"compose_name\" /></td></tr>
+                <tr><td align=\"right\">Repo URL:</td><td><input name=\"repo_url\" /></td></tr>
+                <tr><td align=\"right\">Access URL:</td><td><input name=\"access_url\" /></td></tr>
+                <tr><td align=\"right\">Active:</td><td><input name=\"active\" type=\"checkbox\" value=\"true\" /></td></tr>
+                <tr><td align=\"right\">Credential:</td><td><input name=\"cred_file\" /></td></tr>
+                <tr><td align=\"center\" colspan=\"2\"><button type=\"submit\">Submit</button></td></tr>
+            </table>
+        </form>
         ",
     );
 }
@@ -226,9 +241,10 @@ pub async fn edit_service_form(
 #[derive(Deserialize)]
 pub struct ServiceForm {
     name: String,
+    compose_name: String,
     repo_url: String,
     access_url: String,
-    active: bool,
+    active: Option<bool>,
     cred_file: Option<String>,
 }
 
@@ -241,9 +257,10 @@ pub async fn add_new_service(
     let service = Service {
         id: 0, // NOT USED
         name: service_form.name,
+        compose_name: service_form.compose_name,
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
-        active: service_form.active,
+        active: service_form.active.unwrap_or(false),
         cred_file: service_form.cred_file,
     };
 
@@ -275,9 +292,10 @@ pub async fn edit_existing_service(
     let service = Service {
         id: 0, // NOT USED
         name: service_form.name,
+        compose_name: service_form.compose_name,
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
-        active: service_form.active,
+        active: service_form.active.unwrap_or(false),
         cred_file: service_form.cred_file,
     };
 

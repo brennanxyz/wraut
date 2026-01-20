@@ -1,3 +1,5 @@
+use axum::response::sse::Event;
+
 use crate::modules::{HTMLTarget, ServiceHTML, db::DBError};
 
 use super::{DockerServiceEntry, Service, ServiceError, ServiceStatus};
@@ -55,7 +57,7 @@ pub fn list(
                                     }
                                 )
                             })
-                            .collect::<String>()
+                            .collect::<String>(),
                     ),
                 }],
             },
@@ -124,6 +126,21 @@ pub fn list(
     }
 }
 
+pub fn reset_button() -> Event {
+    Event::default().event("service_event").data(
+        "<div
+        id=\"add-service-btn\"
+        style=\"margin:12px;border-radius:4px;cursor:pointer;\"
+        class=\"success-chip\"
+        hx-get=\"/html/service_form\"
+        hx-swap=\"outerHTML\"
+        hx-swap-oob=\"true\"
+    >
+        + Add service
+    </div>",
+    )
+}
+
 fn app_status_class(status: &ServiceStatus) -> String {
     match status {
         ServiceStatus::Unknown => "unknown".to_string(),
@@ -136,6 +153,7 @@ fn app_status_class(status: &ServiceStatus) -> String {
         | ServiceStatus::Stopping
         | ServiceStatus::Starting
         | ServiceStatus::Copying
+        | ServiceStatus::RewritingConfig
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }
@@ -168,6 +186,7 @@ fn service_class_name(status: &ServiceStatus) -> String {
         | ServiceStatus::Stopping
         | ServiceStatus::Starting
         | ServiceStatus::Copying
+        | ServiceStatus::RewritingConfig
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }

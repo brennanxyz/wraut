@@ -12,7 +12,7 @@ pub enum DBError {
 pub async fn get_services(pool: &SqlitePool) -> Result<Vec<Service>, DBError> {
     let rows = sqlx::query!(
         r#"
-            SELECT id, name, repo_url, access_url, active, cred_file FROM service
+            SELECT id, name, compose_name, repo_url, access_url, active, cred_file FROM service
         "#
     )
     .fetch_all(pool)
@@ -23,6 +23,7 @@ pub async fn get_services(pool: &SqlitePool) -> Result<Vec<Service>, DBError> {
         .map(|row| Service {
             id: row.id,
             name: row.name,
+            compose_name: row.compose_name,
             repo_url: row.repo_url,
             access_url: row.access_url,
             active: row.active,
@@ -37,7 +38,7 @@ pub async fn get_service(pool: &SqlitePool, service_id: i64) -> Result<Service, 
     let result = sqlx::query_as!(
         Service,
         r#"
-            SELECT id, name, repo_url, access_url, active, cred_file FROM service WHERE id = $1
+            SELECT id, name, compose_name, repo_url, access_url, active, cred_file FROM service WHERE id = $1
         "#,
         service_id,
     )
