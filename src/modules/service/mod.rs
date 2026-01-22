@@ -182,7 +182,25 @@ impl Service {
     }
 
     fn make_labels(&self) -> Vec<String> {
-        vec![self.label_name()]
+        // TODO: swap websecure and certresolver out for config values.
+        vec![
+            self.label_name(),
+            "traefik.enable=true".into(),
+            format!(
+                "traefik.http.routers.{}.entrypoints=websecure",
+                self.name.clone()
+            ),
+            format!(
+                "traefik.http.routers.{}.rule=Host(`{}`)",
+                self.name.clone(),
+                self.access_url
+            ),
+            format!("traefik.http.routers.{}.tls=true", self.name.clone()),
+            format!(
+                "traefik.http.routers.{}.tls.certresolver=letsencrypt",
+                self.name.clone()
+            ),
+        ]
     }
 
     // on Result::Ok, returns path, and a boolean: true = created; false = got existing
