@@ -50,10 +50,11 @@ pub async fn get_service(pool: &SqlitePool, service_id: i64) -> Result<Service, 
 
 pub async fn new_service(pool: &SqlitePool, service: Service) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT INTO service (name, repo_url, access_url, active, use_key)
-        VALUES ($1, $2, $3, $4, $5)
+        "INSERT INTO service (name, compose_name, repo_url, access_url, active, use_key)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id",
         service.name,
+        service.compose_name,
         service.repo_url,
         service.access_url,
         service.active,
@@ -66,8 +67,9 @@ pub async fn new_service(pool: &SqlitePool, service: Service) -> Result<(), DBEr
 
 pub async fn update_service(pool: &SqlitePool, id: i64, service: Service) -> Result<(), DBError> {
     sqlx::query!(
-        "UPDATE service SET name = $1, repo_url = $2, access_url = $3, active = $4, use_key = $5  WHERE id = $6 RETURNING id",
+        "UPDATE service SET name = $1, compose_name = $2, repo_url = $3, access_url = $4, active = $5, use_key = $6  WHERE id = $7 RETURNING id",
         service.name,
+        service.compose_name,
         service.repo_url,
         service.access_url,
         service.active,
