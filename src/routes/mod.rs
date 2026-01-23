@@ -197,7 +197,7 @@ pub async fn new_service_form() -> impl IntoResponse {
                 <tr><td align=\"right\">Repo URL:</td><td><input name=\"repo_url\" /></td></tr>
                 <tr><td align=\"right\">Access URL:</td><td><input name=\"access_url\" /></td></tr>
                 <tr><td align=\"right\">Active:</td><td><input name=\"active\" type=\"checkbox\" value=\"true\" /></td></tr>
-                <tr><td align=\"right\">Credential:</td><td><input name=\"cred_file\" /></td></tr>
+                <tr><td align=\"right\">Use key:</td><td><input name=\"use_key\" type=\"checkbox\" value=\"false\" /></td></tr>
                 <tr><td align=\"center\" colspan=\"2\"><button type=\"submit\">Submit</button></td></tr>
             </table>
         </form>
@@ -245,7 +245,7 @@ pub struct ServiceForm {
     repo_url: String,
     access_url: String,
     active: Option<bool>,
-    cred_file: Option<String>,
+    use_key: Option<bool>,
 }
 
 pub async fn add_new_service(
@@ -261,7 +261,7 @@ pub async fn add_new_service(
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
         active: service_form.active.unwrap_or(false),
-        cred_file: service_form.cred_file,
+        use_key: service_form.use_key.unwrap_or(false),
     };
 
     match db::new_service(&app_state.pool, service).await {
@@ -296,7 +296,7 @@ pub async fn edit_existing_service(
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
         active: service_form.active.unwrap_or(false),
-        cred_file: service_form.cred_file,
+        use_key: service_form.use_key.unwrap_or(false),
     };
 
     match db::update_service(&app_state.pool, service_id, service).await {

@@ -31,6 +31,7 @@ pub struct Config {
     pub app_port: u16,
     pub services_repo_dir: PathBuf,
     pub services_live_dir: PathBuf,
+    pub key_file: PathBuf,
 }
 
 impl Config {
@@ -43,12 +44,15 @@ impl Config {
         let services_repo_dir = Path::new(services_repo_dir_string.as_str());
         let services_live_dir_string: String = env::var("SERVICE_LIVE_PATH")?;
         let services_live_dir = Path::new(services_live_dir_string.as_str());
+        let key_file_string: String = env::var("KEY_FILE")?;
+        let key_file = Path::new(key_file_string.as_str());
         Ok(Config {
             db_url,
             app_host,
             app_port,
             services_repo_dir: services_repo_dir.to_path_buf(),
             services_live_dir: services_live_dir.to_path_buf(),
+            key_file: key_file.to_path_buf(),
         })
     }
 }

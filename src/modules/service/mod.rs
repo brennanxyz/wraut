@@ -91,7 +91,7 @@ pub struct Service {
     pub repo_url: String,
     pub access_url: String,
     pub active: bool,
-    pub cred_file: Option<String>,
+    pub use_key: bool,
 }
 
 #[allow(non_snake_case, dead_code)]
@@ -251,9 +251,12 @@ impl Service {
         config: Config,
         br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
-        let cf_string_opt = match self.cred_file.clone() {
-            Some(cf) => Some(format!(" -c \"core.sshCommand=ssh -i {}\" ", cf)),
-            None => None,
+        let cf_string_opt = match self.use_key {
+            true => Some(format!(
+                " -c \"core.sshCommand=ssh -i {}\" ",
+                config.key_file.to_string_lossy().to_string()
+            )),
+            false => None,
         };
 
         let mut path = config.services_repo_dir;

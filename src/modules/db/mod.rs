@@ -12,7 +12,7 @@ pub enum DBError {
 pub async fn get_services(pool: &SqlitePool) -> Result<Vec<Service>, DBError> {
     let rows = sqlx::query!(
         r#"
-            SELECT id, name, compose_name, repo_url, access_url, active, cred_file FROM service
+            SELECT id, name, compose_name, repo_url, access_url, active, use_key FROM service
         "#
     )
     .fetch_all(pool)
@@ -27,7 +27,7 @@ pub async fn get_services(pool: &SqlitePool) -> Result<Vec<Service>, DBError> {
             repo_url: row.repo_url,
             access_url: row.access_url,
             active: row.active,
-            cred_file: row.cred_file,
+            use_key: row.use_key,
         })
         .collect();
 
@@ -38,7 +38,7 @@ pub async fn get_service(pool: &SqlitePool, service_id: i64) -> Result<Service, 
     let result = sqlx::query_as!(
         Service,
         r#"
-            SELECT id, name, compose_name, repo_url, access_url, active, cred_file FROM service WHERE id = $1
+            SELECT id, name, compose_name, repo_url, access_url, active, use_key FROM service WHERE id = $1
         "#,
         service_id,
     )
@@ -50,14 +50,14 @@ pub async fn get_service(pool: &SqlitePool, service_id: i64) -> Result<Service, 
 
 pub async fn new_service(pool: &SqlitePool, service: Service) -> Result<(), DBError> {
     sqlx::query!(
-        "INSERT INTO service (name, repo_url, access_url, active, cred_file)
+        "INSERT INTO service (name, repo_url, access_url, active, use_key)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id",
         service.name,
         service.repo_url,
         service.access_url,
         service.active,
-        service.cred_file,
+        service.use_key,
     )
     .fetch_one(pool)
     .await?;
@@ -66,12 +66,12 @@ pub async fn new_service(pool: &SqlitePool, service: Service) -> Result<(), DBEr
 
 pub async fn update_service(pool: &SqlitePool, id: i64, service: Service) -> Result<(), DBError> {
     sqlx::query!(
-        "UPDATE service SET name = $1, repo_url = $2, access_url = $3, active = $4, cred_file = $5  WHERE id = $6 RETURNING id",
+        "UPDATE service SET name = $1, repo_url = $2, access_url = $3, active = $4, use_key = $5  WHERE id = $6 RETURNING id",
         service.name,
         service.repo_url,
         service.access_url,
         service.active,
-        service.cred_file,
+        service.use_key,
         id,
     )
     .fetch_one(pool)
