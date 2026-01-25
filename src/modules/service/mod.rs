@@ -141,9 +141,16 @@ impl Service {
     }
 
     pub async fn get_list() -> Result<Vec<DockerServiceEntry>, ServiceError> {
-        let output = Command::new("docker")
+        let output = match Command::new("docker")
             .args(vec!["ps", "--format", "json"])
-            .output()?;
+            .output()
+        {
+            Ok(json) => json,
+            Err(e) => {
+                event!(Level::ERROR, "{}", e);
+                return Err(ServiceError::Command(e));
+            }
+        };
 
         match output.status.success() {
             true => (),
