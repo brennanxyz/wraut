@@ -49,7 +49,7 @@ pub fn list(
                                     </span>
                                     <span
                                         style=\"cursor:pointer;\"
-                                        hx-get=\"/api/service/{}/delete\"
+                                        hx-delete=\"/api/service/{}\"
                                         hx-confirm=\"Are you sure you want to delete {}?\"
                                     >
                                         &#128163;
@@ -147,16 +147,18 @@ pub fn list(
 
 pub fn reset_button() -> Event {
     Event::default().event("service_event").data(
-        "<div
-        id=\"add-service-btn\"
-        style=\"margin:12px;border-radius:4px;cursor:pointer;\"
-        class=\"success-chip\"
-        hx-get=\"/html/service_form\"
-        hx-swap=\"outerHTML\"
-        hx-swap-oob=\"true\"
-    >
-        + Add service
-    </div>",
+        "
+        <div id=\"link-status\" class=\"success-chip\">Connected</div>
+        <div
+            id=\"add-service-btn\"
+            style=\"margin:12px;border-radius:4px;cursor:pointer;\"
+            class=\"success-chip\"
+            hx-get=\"/html/service_form\"
+            hx-swap=\"outerHTML\"
+            hx-swap-oob=\"true\"
+        >
+            + Add service
+        </div>",
     )
 }
 

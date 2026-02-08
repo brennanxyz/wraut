@@ -4,12 +4,16 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde_yaml::Error as SerdeError;
+use sqlx::SqlitePool;
 use std::process::{Command, Output};
 use thiserror::Error;
 use tokio::sync::broadcast;
 use tracing::{Level, event};
 
-use super::{Config, db::DBError};
+use super::{
+    Config,
+    db::{DBError, delete_service_entry},
+};
 
 #[derive(Clone, Debug)]
 pub enum ServiceStatus {
@@ -54,6 +58,10 @@ impl ServiceStatus {
             ServiceError::Unknown => Self::Unknown,
             ServiceError::Discovery => Self::DiscoveryFailed,
             ServiceError::CloneOrPull => Self::CloneOrPullFailed,
+            ServiceError::Delete => {
+                Self::CommandFailed("Failed to remove entire directory".to_string())
+            }
+            ServiceError::Db(_) => Self::CommandFailed("Failed to run database action".to_string()),
         }
     }
 
@@ -133,6 +141,10 @@ pub enum ServiceError {
     Yaml(#[from] SerdeError),
     #[error("Error parsing expected key")]
     Key(String),
+    #[error("Error deleting entire service")]
+    Delete,
+    #[error("Error running database action")]
+    Db(#[from] DBError),
 }
 
 impl Service {
@@ -188,6 +200,35 @@ impl Service {
         }
     }
 
+    pub fn try_delete(&self, mut parent_path: PathBuf) -> () {
+        parent_path.push(self.name.clone());
+        let path = parent_path;
+        let _ = Command::new("rm")
+            .args(vec!["-rf", &path.to_string_lossy().to_string()])
+            .output();
+        ()
+    }
+
+    pub fn delete(&self, mut parent_path: PathBuf) -> Result<(), ServiceError> {
+        parent_path.push(self.name.clone());
+        let path = parent_path;
+        Command::new("rm")
+            .args(vec!["-rf", &path.to_string_lossy().to_string()])
+            .output()?;
+        Ok(())
+    }
+
+    pub fn try_remove_from_docker(&self, mut parent_path: PathBuf) -> () {
+        parent_path.push(self.name.clone());
+        let path = parent_path;
+        let _ = Command::new("docker")
+            .args(vec!["compose", "rm", "-f"])
+            .current_dir(path)
+            .output();
+
+        ()
+    }
+
     fn make_labels(&self) -> Vec<String> {
         // TODO: swap websecure and certresolver out for config values.
         vec![
@@ -232,21 +273,13 @@ impl Service {
         match chkdir_output_string {
             "Y\n" => Ok((path, false)),
             "N\n" => {
-                event!(Level::WARN, "mkdir {}", path.to_string_lossy());
                 let mkdir_output = Command::new("mkdir")
                     .arg(format!("{}", path.to_string_lossy()))
                     .output()?;
 
                 match mkdir_output.status.success() {
                     true => Ok((path, true)),
-                    false => {
-                        event!(
-                            Level::WARN,
-                            "{}",
-                            std::str::from_utf8(&mkdir_output.stderr)?
-                        );
-                        Err(ServiceError::Status)
-                    }
+                    false => Err(ServiceError::Status),
                 }
             }
             _ => Err(ServiceError::Unexpected),
@@ -585,6 +618,58 @@ impl Service {
                 );
                 let _ = br.send(ServiceEvent::UnknownEvent { msg: e.to_string() });
                 Err(ServiceError::Unknown)
+            }
+        }
+    }
+
+    pub async fn delete_service(
+        config: Config,
+        pool: &SqlitePool,
+        service: Result<Service, DBError>,
+        br: broadcast::Sender<ServiceEvent>,
+    ) -> Result<(), ServiceError> {
+        event!(Level::INFO, "Deleting service...");
+
+        match service {
+            Ok(serv) => {
+                let services = match Self::get_list().await {
+                    Ok(lst) => lst,
+                    Err(_e) => {
+                        let _ = br.send(ServiceEvent::ServiceUpdate {
+                            id: serv.id,
+                            status: ServiceStatus::DiscoveryFailed,
+                        });
+                        return Err(ServiceError::Discovery);
+                    }
+                };
+
+                if serv.is_running(&services) {
+                    serv.stop(config.clone(), &br)?;
+                }
+                // try to remove from docker
+                serv.try_remove_from_docker(config.services_live_dir.clone());
+
+                // delete live dir
+                serv.try_delete(config.services_live_dir);
+
+                // delete service dir
+                serv.delete(config.services_repo_dir)?;
+
+                // delete from db
+                delete_service_entry(pool, serv.id).await?;
+
+                let _ = br.send(ServiceEvent::AllStatus);
+
+                Ok(())
+            }
+            Err(e) => {
+                event!(
+                    Level::ERROR,
+                    "Service not successfully pulled from database | {}",
+                    e
+                );
+                let _ = br.send(ServiceEvent::UnknownEvent { msg: e.to_string() });
+                Err(ServiceError::Delete)
             }
         }
     }

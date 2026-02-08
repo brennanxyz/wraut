@@ -38,8 +38,8 @@ selecting the appropriate values).
 ## TODO
 - [x] Make a refresh button on each service
 - [x] Make a delete button on each service
-  - [ ] Make a deletion event
-  - [ ] Make a deletion flow
+  - [x] Make a deletion event
+  - [x] Make a deletion flow
 - [ ] Make a deactivate button
   - [ ] Make a deactivation event
   - [ ] Make a deactivation flow

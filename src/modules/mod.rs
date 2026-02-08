@@ -14,7 +14,6 @@ use service::{Service, ServiceEvent};
 use sqlx::{Pool, Sqlite, SqlitePool};
 use thiserror::Error;
 use tokio::sync::broadcast;
-use tracing::{Level, event};
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -153,7 +152,6 @@ impl ServiceBroadcast {
                         yield(Ok(service::html::reset_button()));
                     },
                     ServiceEvent::ServiceUpdate {id, status} => {
-                        event!(Level::WARN, "{:?}", status);
                         let service = db::get_service(&pool, id).await;
                         yield(Ok(service::html::service(service, status).render()));
                     },

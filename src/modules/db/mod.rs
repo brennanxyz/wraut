@@ -80,3 +80,10 @@ pub async fn update_service(pool: &SqlitePool, id: i64, service: Service) -> Res
     .await?;
     Ok(())
 }
+
+pub async fn delete_service_entry(pool: &SqlitePool, id: i64) -> Result<(), DBError> {
+    sqlx::query!("DELETE FROM service WHERE id = $1", id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}

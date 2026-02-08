@@ -348,6 +348,25 @@ pub async fn deploy_service(
     "OK"
 }
 
+pub async fn delete_service(
+    State(app_state): State<AppState>,
+    Path(service_id): Path<i64>,
+) -> impl IntoResponse {
+    event!(Level::INFO, "DELETE /api/service/:id");
+    let service = db::get_service(&app_state.pool, service_id.clone()).await;
+    tokio::spawn(async move {
+        Service::delete_service(
+            app_state.config,
+            &app_state.pool,
+            service,
+            app_state.service_broadcast.broadcaster,
+        )
+        .await
+    });
+
+    "OK"
+}
+
 pub async fn live_services(
     State(app_state): State<AppState>,
 ) -> Sse<impl Stream<Item = Result<Event, axum::Error>>> {
