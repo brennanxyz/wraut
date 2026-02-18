@@ -429,7 +429,7 @@ impl Service {
         // Read docker-compose file
         let mut compose_path = config.services_live_dir;
         compose_path.push(self.name.clone());
-        compose_path.push("docker-compose.yaml");
+        compose_path.push("docker-compose.yml");
         let compose_content = std::fs::read_to_string(compose_path.clone())?;
         let mut compose: serde_yaml::Value = serde_yaml::from_str(&compose_content)?;
 
