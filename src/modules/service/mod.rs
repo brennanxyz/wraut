@@ -253,6 +253,8 @@ impl Service {
 
     // on Result::Ok, returns path, and a boolean: true = created; false = got existing
     fn get_or_create_directory(path: PathBuf) -> Result<(PathBuf, bool), ServiceError> {
+        event!(Level::INFO, "Getting or creating path | {:?}", path);
+
         let chkdir_output = Command::new("sh")
             .arg("-c")
             .arg(format!(
@@ -260,6 +262,7 @@ impl Service {
                 path.to_string_lossy()
             ))
             .output()?;
+        event!(Level::INFO, "Checked output.");
 
         match chkdir_output.status.success() {
             true => (),
@@ -269,6 +272,7 @@ impl Service {
         }
 
         let chkdir_output_string = std::str::from_utf8(&chkdir_output.stdout)?;
+        event!(Level::INFO, "Converted checked output to string.");
 
         match chkdir_output_string {
             "Y\n" => Ok((path, false)),
@@ -276,6 +280,7 @@ impl Service {
                 let mkdir_output = Command::new("mkdir")
                     .arg(format!("{}", path.to_string_lossy()))
                     .output()?;
+                event!(Level::INFO, "Made directory.");
 
                 match mkdir_output.status.success() {
                     true => Ok((path, true)),
@@ -596,6 +601,10 @@ impl Service {
                     }
                 };
 
+                let _ = br.send(ServiceEvent::ServiceUpdate {
+                    id: serv.id,
+                    status: ServiceStatus::Cloning,
+                });
                 serv.clone_or_pull(config.clone(), &br)?;
 
                 serv.copy_to_live(config.clone(), &br)?;
