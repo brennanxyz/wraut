@@ -319,6 +319,13 @@ impl Service {
                 if let Some(ref ssh_cmd) = ssh_command_opt {
                     cmd.arg("-c").arg(format!("core.sshCommand={}", ssh_cmd));
                 }
+
+                event!(
+                    Level::INFO,
+                    "GIT ARGS: {:?}",
+                    cmd.get_args().collect::<Vec<_>>()
+                );
+
                 cmd.arg("clone")
                     .arg(self.repo_url.clone())
                     .arg(path.to_string_lossy().to_string())
