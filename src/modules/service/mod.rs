@@ -102,6 +102,7 @@ pub struct Service {
     pub id: i64,
     pub name: String,
     pub compose_name: String,
+    pub port: i64,
     pub repo_url: String,
     pub access_url: String,
     pub active: bool,
@@ -253,6 +254,11 @@ impl Service {
             format!(
                 "traefik.http.routers.{}.tls.certresolver=letsencrypt",
                 self.name.clone()
+            ),
+            format!(
+                "traefik.http.services.{}.loadbalancer.server.port={}",
+                self.name.clone(),
+                self.port,
             ),
         ]
     }

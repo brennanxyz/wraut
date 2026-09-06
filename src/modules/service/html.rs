@@ -22,6 +22,7 @@ pub fn list(
                         <tr>
                             <th>ID</th>
                             <th>Name</th>
+                            <th>Port</th>
                             <th>Repo</th>
                             <th>URL</th>
                             <th>Active</th>
@@ -35,6 +36,7 @@ pub fn list(
                                 format!(
                                     "
                             <tr>
+                                <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
@@ -70,6 +72,7 @@ pub fn list(
                         ",
                                     dbe.id,
                                     dbe.name,
+                                    dbe.port,
                                     dbe.repo_url,
                                     dbe.access_url,
                                     dbe.active,
@@ -106,6 +109,7 @@ pub fn list(
                         <tr>
                             <th>ID</th>
                             <th>Name</th>
+                            <th>Port</th>
                             <th>Repo</th>
                             <th>URL</th>
                             <th>Active</th>
@@ -120,6 +124,7 @@ pub fn list(
                                 format!(
                                     "
                             <tr>
+                                <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
@@ -155,6 +160,7 @@ pub fn list(
                         ",
                                     dbe.id,
                                     dbe.name,
+                                    dbe.port,
                                     dbe.repo_url,
                                     dbe.access_url,
                                     dbe.active,

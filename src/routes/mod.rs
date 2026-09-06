@@ -194,6 +194,7 @@ pub async fn new_service_form() -> impl IntoResponse {
             <table>
                 <tr><td align=\"right\">Name:</td><td><input name=\"name\" /></td></tr>
                 <tr><td align=\"right\">Compose Name:</td><td><input name=\"compose_name\" /></td></tr>
+                <tr><td align=\"right\">Port:</td><td><input name=\"port\" type=\"number\"/></td></tr>
                 <tr><td align=\"right\">Repo URL:</td><td><input name=\"repo_url\" /></td></tr>
                 <tr><td align=\"right\">Access URL:</td><td><input name=\"access_url\" /></td></tr>
                 <tr><td align=\"right\">Active:</td><td><input name=\"active\" type=\"checkbox\" value=\"true\" /></td></tr>
@@ -242,6 +243,7 @@ pub async fn edit_service_form(
 pub struct ServiceForm {
     name: String,
     compose_name: String,
+    port: i64,
     repo_url: String,
     access_url: String,
     active: Option<bool>,
@@ -258,6 +260,7 @@ pub async fn add_new_service(
         id: 0, // NOT USED
         name: service_form.name,
         compose_name: service_form.compose_name,
+        port: service_form.port,
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
         active: service_form.active.unwrap_or(false),
@@ -293,6 +296,7 @@ pub async fn edit_existing_service(
         id: 0, // NOT USED
         name: service_form.name,
         compose_name: service_form.compose_name,
+        port: service_form.port,
         repo_url: service_form.repo_url,
         access_url: service_form.access_url,
         active: service_form.active.unwrap_or(false),
