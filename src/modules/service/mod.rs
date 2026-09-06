@@ -298,7 +298,7 @@ impl Service {
     ) -> Result<(), ServiceError> {
         let cf_string_opt = match self.use_key {
             true => Some(format!(
-                " -c \"core.sshCommand=ssh -i {}\" ",
+                "-c core.sshCommand=\"ssh -i {} -o IdentitiesOnly=yes\" ",
                 config.key_file.to_string_lossy().to_string()
             )),
             false => None,
@@ -318,8 +318,8 @@ impl Service {
 
                 match cf_string_opt {
                     Some(cf_string) => Command::new("git")
-                        .arg("clone")
                         .arg(cf_string)
+                        .arg("clone")
                         .arg(self.repo_url.clone())
                         .arg(path.to_string_lossy().to_string())
                         .output()?,
