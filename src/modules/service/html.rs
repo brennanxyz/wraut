@@ -106,6 +106,7 @@ pub fn list(
                             <th>Repo</th>
                             <th>URL</th>
                             <th>Active</th>
+                            <th>Key</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -116,6 +117,7 @@ pub fn list(
                                 format!(
                                     "
                             <tr>
+                                <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
                                 <td>{}</td>
@@ -153,6 +155,7 @@ pub fn list(
                                     dbe.repo_url,
                                     dbe.access_url,
                                     dbe.active,
+                                    dbe.use_key,
                                     dbe.id,
                                     ServiceStatus::Unknown.to_string(),
                                     dbe.id,

@@ -91,7 +91,7 @@ pub enum ServiceEvent {
     UnknownEvent { msg: String },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Service {
     pub id: i64,
     pub name: String,
@@ -296,6 +296,7 @@ impl Service {
         config: Config,
         br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
+        event!(Level::INFO, "GIT OR CLONE SERVICE | {:?}", self);
         let ssh_command_opt = self.use_key.then(|| {
             format!(
                 "ssh -i {} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
@@ -317,6 +318,7 @@ impl Service {
 
                 let mut cmd = Command::new("git");
                 if let Some(ref ssh_cmd) = ssh_command_opt {
+                    event!(Level::INFO, "Using key.");
                     cmd.arg("-c").arg(format!("core.sshCommand={}", ssh_cmd));
                 }
 
