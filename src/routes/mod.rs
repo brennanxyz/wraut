@@ -197,7 +197,7 @@ pub async fn new_service_form() -> impl IntoResponse {
                 <tr><td align=\"right\">Repo URL:</td><td><input name=\"repo_url\" /></td></tr>
                 <tr><td align=\"right\">Access URL:</td><td><input name=\"access_url\" /></td></tr>
                 <tr><td align=\"right\">Active:</td><td><input name=\"active\" type=\"checkbox\" value=\"true\" /></td></tr>
-                <tr><td align=\"right\">Use key:</td><td><input name=\"use_key\" type=\"checkbox\" value=\"false\" /></td></tr>
+                <tr><td align=\"right\">Use key:</td><td><input name=\"use_key\" type=\"checkbox\" value=\"true\" /></td></tr>
                 <tr><td align=\"center\" colspan=\"2\"><button type=\"submit\">Submit</button></td></tr>
             </table>
         </form>
