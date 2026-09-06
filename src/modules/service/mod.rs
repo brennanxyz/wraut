@@ -298,7 +298,7 @@ impl Service {
     ) -> Result<(), ServiceError> {
         let cf_string_opt = match self.use_key {
             true => Some(format!(
-                "-c core.sshCommand=\"ssh -i {} -o IdentitiesOnly=yes\" ",
+                "-c core.sshCommand=\"ssh -i {} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"",
                 config.key_file.to_string_lossy().to_string()
             )),
             false => None,
