@@ -222,6 +222,7 @@ fn app_status_class(status: &ServiceStatus) -> String {
         | ServiceStatus::Starting
         | ServiceStatus::Copying
         | ServiceStatus::RewritingConfig
+        | ServiceStatus::PreparingVolumes
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }
@@ -255,6 +256,7 @@ fn service_class_name(status: &ServiceStatus) -> String {
         | ServiceStatus::Starting
         | ServiceStatus::Copying
         | ServiceStatus::RewritingConfig
+        | ServiceStatus::PreparingVolumes
         | ServiceStatus::DeploymentRequested => "warning".to_string(),
     }
 }

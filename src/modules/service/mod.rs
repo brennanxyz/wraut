@@ -1,6 +1,10 @@
 pub mod html;
 
-use std::path::PathBuf;
+use std::{
+    fs,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 use serde_yaml::Error as SerdeError;
@@ -29,6 +33,7 @@ pub enum ServiceStatus {
     Starting,
     Copying,
     RewritingConfig,
+    PreparingVolumes,
     Unknown,
 }
 
@@ -79,6 +84,7 @@ impl ServiceStatus {
             Self::Starting => "Starting service...".into(),
             Self::Copying => "Copying repo...".into(),
             Self::RewritingConfig => "Rewriting docker-compose.yml...".into(),
+            Self::PreparingVolumes => "Preparing volumes...".into(),
             Self::Unknown => "Unknown status".into(),
         }
     }
@@ -489,6 +495,95 @@ impl Service {
         Ok(())
     }
 
+    pub fn prepare_volumes(
+        &self,
+        config: Config,
+        br: &broadcast::Sender<ServiceEvent>,
+    ) -> Result<(), ServiceError> {
+        let _ = br.send(ServiceEvent::ServiceUpdate {
+            id: self.id,
+            status: ServiceStatus::PreparingVolumes,
+        });
+
+        // Read docker-compose file
+        let mut compose_path = config.services_live_dir;
+        compose_path.push(self.name.clone());
+        compose_path.push("docker-compose.yml");
+        let compose_content = std::fs::read_to_string(compose_path.clone())?;
+        let mut compose: serde_yaml::Value = serde_yaml::from_str(&compose_content)?;
+
+        // Get or create labels
+        let services = match compose.get_mut("services") {
+            Some(svcs) => svcs,
+            None => {
+                return Err(ServiceError::Key("services".into()));
+            }
+        };
+
+        let service = match services.get_mut(self.compose_name.clone()) {
+            Some(svc) => svc,
+            None => {
+                return Err(ServiceError::Key(self.compose_name.clone()));
+            }
+        };
+
+        let service_map = match service.as_mapping_mut() {
+            Some(sm) => sm,
+            None => {
+                return Err(ServiceError::Key(format!(
+                    "{} (as map)",
+                    self.compose_name.clone()
+                )));
+            }
+        };
+
+        let volumes = service_map
+            .entry(serde_yaml::Value::String("volumes".into()))
+            .or_insert_with(|| serde_yaml::Value::Sequence(vec![]));
+
+        let volume_array = match volumes.as_sequence_mut() {
+            Some(la) => la,
+            None => {
+                return Err(ServiceError::Key(format!(
+                    "{} volumes (as sequence)",
+                    self.compose_name.clone()
+                )));
+            }
+        };
+
+        for volume in volume_array {
+            let volume_str = volume.as_str().unwrap_or("");
+            let parts: Vec<&str> = volume_str.splitn(3, ':').collect();
+            if parts.len() < 2 {
+                continue;
+            }
+            let host_path_str = parts[0];
+            let container_path_str = parts[1];
+
+            if !(host_path_str.starts_with('/') || host_path_str.starts_with('.')) {
+                continue; // named volume, not a bind mount
+            }
+
+            let host_path = Path::new(host_path_str);
+            if host_path.exists() {
+                continue;
+            }
+
+            // Can't handle individual files for now
+            let looks_like_file = Path::new(container_path_str).extension().is_some();
+            if looks_like_file {
+                continue;
+            } else {
+                fs::create_dir_all(host_path)?;
+            }
+
+            // Make it permissively writable so any container UID can use it.
+            fs::set_permissions(host_path, fs::Permissions::from_mode(0o777))?;
+        }
+
+        Ok(())
+    }
+
     pub fn stop(
         &self,
         config: Config,
@@ -610,6 +705,8 @@ impl Service {
                 serv.copy_to_live(config.clone(), &br)?;
 
                 serv.apply_tags(config.clone(), &br)?;
+
+                serv.prepare_volumes(config.clone(), &br)?;
 
                 if serv.is_running(&services) {
                     serv.stop(config.clone(), &br)?;
