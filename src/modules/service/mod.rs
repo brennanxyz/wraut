@@ -296,13 +296,12 @@ impl Service {
         config: Config,
         br: &broadcast::Sender<ServiceEvent>,
     ) -> Result<(), ServiceError> {
-        let cf_string_opt = match self.use_key {
-            true => Some(format!(
-                "-c core.sshCommand=\"ssh -i {} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"",
-                config.key_file.to_string_lossy().to_string()
-            )),
-            false => None,
-        };
+        let ssh_command_opt = self.use_key.then(|| {
+            format!(
+                "ssh -i {} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
+                config.key_file.to_string_lossy()
+            )
+        });
 
         let mut path = config.services_repo_dir;
         path.push(&self.name);
@@ -316,19 +315,14 @@ impl Service {
                     status: ServiceStatus::Cloning,
                 });
 
-                match cf_string_opt {
-                    Some(cf_string) => Command::new("git")
-                        .arg(cf_string)
-                        .arg("clone")
-                        .arg(self.repo_url.clone())
-                        .arg(path.to_string_lossy().to_string())
-                        .output()?,
-                    None => Command::new("git")
-                        .arg("clone")
-                        .arg(self.repo_url.clone())
-                        .arg(path.to_string_lossy().to_string())
-                        .output()?,
+                let mut cmd = Command::new("git");
+                if let Some(ref ssh_cmd) = ssh_command_opt {
+                    cmd.arg("-c").arg(format!("core.sshCommand={}", ssh_cmd));
                 }
+                cmd.arg("clone")
+                    .arg(self.repo_url.clone())
+                    .arg(path.to_string_lossy().to_string())
+                    .output()?
             }
             false => {
                 let _ = br.send(ServiceEvent::ServiceUpdate {
@@ -336,14 +330,11 @@ impl Service {
                     status: ServiceStatus::Pulling,
                 });
 
-                match cf_string_opt {
-                    Some(cf_string) => Command::new("git")
-                        .arg("pull")
-                        .arg(cf_string)
-                        .current_dir(path)
-                        .output()?,
-                    None => Command::new("git").arg("pull").current_dir(path).output()?,
+                let mut cmd = Command::new("git");
+                if let Some(ref ssh_cmd) = ssh_command_opt {
+                    cmd.arg("-c").arg(format!("core.sshCommand={}", ssh_cmd));
                 }
+                cmd.arg("pull").current_dir(path).output()?
             }
         };
 
