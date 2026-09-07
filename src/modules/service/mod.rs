@@ -647,7 +647,30 @@ impl Service {
             return Err(ServiceError::Unexpected);
         }
 
-        event!(Level::INFO, "{}", path.to_string_lossy().to_string());
+        let output = match Command::new("docker")
+            .arg("compose")
+            .arg("build")
+            .current_dir(path.to_string_lossy().to_string())
+            .output()
+        {
+            Ok(outp) => outp,
+            Err(e) => {
+                event!(Level::ERROR, "DCE (build) | {}", e);
+                return Err(ServiceError::Command(e));
+            }
+        };
+
+        match output.status.success() {
+            true => (),
+            false => {
+                event!(
+                    Level::ERROR,
+                    "START FAIL (build) | {}",
+                    std::str::from_utf8(&output.stderr)?
+                );
+                return Err(ServiceError::Start);
+            }
+        }
 
         let output = match Command::new("docker")
             .arg("compose")
